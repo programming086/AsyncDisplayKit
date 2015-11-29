@@ -122,19 +122,6 @@
   }
 }
 
-- (void)layoutSubviews
-{
-  if (ASDisplayNodeThreadIsMain()) {
-    [_node __layout];
-  } else {
-    // FIXME: CRASH This should not be happening because of the way we gate -setNeedsLayout, but it has been seen.
-    ASDisplayNodeFailAssert(@"not reached assertion");
-    dispatch_async(dispatch_get_main_queue(), ^ {
-      [_node __layout];
-    });
-  }
-}
-
 - (UIViewContentMode)contentMode
 {
   return ASDisplayNodeUIContentModeFromCAContentsGravity(self.layer.contentsGravity);
@@ -151,38 +138,58 @@
 #pragma mark - Event Handling + UIResponder Overrides
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    if (_node.methodOverrides & ASDisplayNodeMethodOverrideTouchesBegan) {
-        [_node touchesBegan:touches withEvent:event];
-    } else {
-        [super touchesBegan:touches withEvent:event];
-    }
+  if (_node.methodOverrides & ASDisplayNodeMethodOverrideTouchesBegan) {
+    [_node touchesBegan:touches withEvent:event];
+  } else {
+    [super touchesBegan:touches withEvent:event];
+  }
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    if (_node.methodOverrides & ASDisplayNodeMethodOverrideTouchesMoved) {
-        [_node touchesMoved:touches withEvent:event];
-    } else {
-        [super touchesMoved:touches withEvent:event];
-    }
+  if (_node.methodOverrides & ASDisplayNodeMethodOverrideTouchesMoved) {
+    [_node touchesMoved:touches withEvent:event];
+  } else {
+    [super touchesMoved:touches withEvent:event];
+  }
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    if (_node.methodOverrides & ASDisplayNodeMethodOverrideTouchesEnded) {
-        [_node touchesEnded:touches withEvent:event];
-    } else {
-        [super touchesEnded:touches withEvent:event];
-    }
+  if (_node.methodOverrides & ASDisplayNodeMethodOverrideTouchesEnded) {
+    [_node touchesEnded:touches withEvent:event];
+  } else {
+    [super touchesEnded:touches withEvent:event];
+  }
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    if (_node.methodOverrides & ASDisplayNodeMethodOverrideTouchesCancelled) {
-        [_node touchesCancelled:touches withEvent:event];
-    } else {
-        [super touchesCancelled:touches withEvent:event];
-    }
+  if (_node.methodOverrides & ASDisplayNodeMethodOverrideTouchesCancelled) {
+    [_node touchesCancelled:touches withEvent:event];
+  } else {
+    [super touchesCancelled:touches withEvent:event];
+  }
+}
+
+- (void)__forwardTouchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
+{
+  [super touchesBegan:touches withEvent:event];
+}
+
+- (void)__forwardTouchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
+{
+  [super touchesMoved:touches withEvent:event];
+}
+
+- (void)__forwardTouchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
+{
+  [super touchesEnded:touches withEvent:event];
+}
+
+- (void)__forwardTouchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event
+{
+  [super touchesCancelled:touches withEvent:event];
 }
 
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event
@@ -234,6 +241,14 @@
     [super tintColorDidChange];
     
     [_node tintColorDidChange];
+}
+
+- (BOOL)canBecomeFirstResponder {
+    return [_node canBecomeFirstResponder];
+}
+
+- (BOOL)canResignFirstResponder {
+    return [_node canResignFirstResponder];
 }
 
 - (BOOL)canPerformAction:(SEL)action withSender:(id)sender

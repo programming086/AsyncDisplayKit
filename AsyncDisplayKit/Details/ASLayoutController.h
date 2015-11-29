@@ -12,7 +12,6 @@
 #import <AsyncDisplayKit/ASLayoutRangeType.h>
 #import <AsyncDisplayKit/ASScrollDirection.h>
 
-
 typedef struct {
   CGFloat leadingBufferScreenfuls;
   CGFloat trailingBufferScreenfuls;
@@ -27,6 +26,12 @@ typedef struct {
  */
 - (ASRangeTuningParameters)tuningParametersForRangeType:(ASLayoutRangeType)rangeType;
 
+- (BOOL)shouldUpdateForVisibleIndexPaths:(NSArray *)indexPaths viewportSize:(CGSize)viewportSize rangeType:(ASLayoutRangeType)rangeType;
+
+- (NSSet *)indexPathsForScrolling:(ASScrollDirection)scrollDirection viewportSize:(CGSize)viewportSize rangeType:(ASLayoutRangeType)rangeType;
+
+@optional
+
 - (void)insertNodesAtIndexPaths:(NSArray *)indexPaths withSizes:(NSArray *)nodeSizes;
 
 - (void)deleteNodesAtIndexPaths:(NSArray *)indexPaths;
@@ -36,15 +41,5 @@ typedef struct {
 - (void)deleteSectionsAtIndexSet:(NSIndexSet *)indexSet;
 
 - (void)setVisibleNodeIndexPaths:(NSArray *)indexPaths;
-
-- (BOOL)shouldUpdateForVisibleIndexPaths:(NSArray *)indexPaths viewportSize:(CGSize)viewportSize rangeType:(ASLayoutRangeType)rangeType;
-
-- (NSSet *)indexPathsForScrolling:(enum ASScrollDirection)scrollDirection viewportSize:(CGSize)viewportSize rangeType:(ASLayoutRangeType)rangeType;
-
-@property (nonatomic, assign) ASRangeTuningParameters tuningParameters ASDISPLAYNODE_DEPRECATED;
-
-- (BOOL)shouldUpdateForVisibleIndexPath:(NSArray *)indexPath viewportSize:(CGSize)viewportSize ASDISPLAYNODE_DEPRECATED;
-
-- (NSSet *)indexPathsForScrolling:(enum ASScrollDirection)scrollDirection viewportSize:(CGSize)viewportSize ASDISPLAYNODE_DEPRECATED;
 
 @end

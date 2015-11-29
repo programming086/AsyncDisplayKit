@@ -196,7 +196,9 @@ void _ASEnumerateControlEventsIncludedInMaskWithBlock(ASControlNodeEvent mask, v
 {
   // If we're interested in touches, this is a tap (the only gesture we care about) and passed -hitTest for us, then no, you may not begin. Sir.
   if (self.enabled && [gestureRecognizer isKindOfClass:[UITapGestureRecognizer class]] && gestureRecognizer.view != self.view) {
-    return NO;
+    UITapGestureRecognizer *tapRecognizer = (UITapGestureRecognizer *)gestureRecognizer;
+    // Allow double-tap gestures
+    return tapRecognizer.numberOfTapsRequired != 1;
   }
 
   // Otherwise, go ahead. :]
@@ -224,7 +226,7 @@ void _ASEnumerateControlEventsIncludedInMaskWithBlock(ASControlNodeEvent mask, v
       if (!eventDispatchTable)
       {
         // Create the dispatch table for this event.
-        eventDispatchTable = [NSMapTable strongToStrongObjectsMapTable];
+        eventDispatchTable = [NSMapTable weakToStrongObjectsMapTable];
         [_controlEventDispatchTable setObject:eventDispatchTable forKey:eventKey];
       }
 

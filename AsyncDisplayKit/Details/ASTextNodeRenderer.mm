@@ -39,6 +39,8 @@ static const CGFloat ASTextNodeRendererTextCapHeightPadding = 1.3;
   NSLayoutManager *_layoutManager;
   NSTextStorage *_textStorage;
   NSTextContainer *_textContainer;
+
+  NSArray *_exclusionPaths;
 }
 
 #pragma mark - Initialization
@@ -47,6 +49,7 @@ static const CGFloat ASTextNodeRendererTextCapHeightPadding = 1.3;
                         truncationString:(NSAttributedString *)truncationString
                           truncationMode:(NSLineBreakMode)truncationMode
                         maximumLineCount:(NSUInteger)maximumLineCount
+                          exclusionPaths:(NSArray *)exclusionPaths
                          constrainedSize:(CGSize)constrainedSize
 {
   if (self = [super init]) {
@@ -57,9 +60,20 @@ static const CGFloat ASTextNodeRendererTextCapHeightPadding = 1.3;
     
     _maximumLineCount = maximumLineCount;
 
+    _exclusionPaths = exclusionPaths;
+
     _constrainedSize = constrainedSize;
   }
   return self;
+}
+
+- (instancetype)initWithAttributedString:(NSAttributedString *)attributedString
+                        truncationString:(NSAttributedString *)truncationString
+                          truncationMode:(NSLineBreakMode)truncationMode
+                        maximumLineCount:(NSUInteger)maximumLineCount
+                         constrainedSize:(CGSize)constrainedSize
+{
+  return [self initWithAttributedString:attributedString truncationString:truncationString truncationMode:truncationMode maximumLineCount:maximumLineCount exclusionPaths:nil constrainedSize:constrainedSize];
 }
 
 /*
@@ -96,6 +110,8 @@ static const CGFloat ASTextNodeRendererTextCapHeightPadding = 1.3;
   _textContainer.lineBreakMode = _truncationMode;
   // Set maximum number of lines
   _textContainer.maximumNumberOfLines = _maximumLineCount;
+
+  _textContainer.exclusionPaths = _exclusionPaths;
 
   [_layoutManager addTextContainer:_textContainer];
 
@@ -157,8 +173,12 @@ static const CGFloat ASTextNodeRendererTextCapHeightPadding = 1.3;
 {
   ASDN::MutexLocker l(_textKitLock);
 
+  if (_attributedString.length == 0) {
+    _calculatedSize = CGSizeZero;
+    return;
+  }
+    
   [self _initializeTextKitComponentsIfNeeded];
-
 
   // Force glyph generation and layout, which may not have happened yet (and
   // isn't triggered by -usedRectForTextContainer:).

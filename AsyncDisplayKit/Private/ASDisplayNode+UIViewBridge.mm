@@ -60,12 +60,47 @@
 #define _messageToLayer(layerSelector) __loaded ? [_layer layerSelector] : [self.pendingViewState layerSelector]
 
 /**
- * This category implements certainly frequently-used properties and methods of UIView and CALayer so that ASDisplayNode clients can just call the view/layer methods on the node,
+ * This category implements certain frequently-used properties and methods of UIView and CALayer so that ASDisplayNode clients can just call the view/layer methods on the node,
  * with minimal loss in performance.  Unlike UIView and CALayer methods, these can be called from a non-main thread until the view or layer is created.
  * This allows text sizing in -calculateSizeThatFits: (essentially a simplified layout) to happen off the main thread
  * without any CALayer or UIView actually existing while still being able to set and read properties from ASDisplayNode instances.
  */
 @implementation ASDisplayNode (UIViewBridge)
+
+- (BOOL)canBecomeFirstResponder
+{
+  return NO;
+}
+
+- (BOOL)canResignFirstResponder
+{
+  return YES;
+}
+
+- (BOOL)isFirstResponder
+{
+  ASDisplayNodeAssertMainThread();
+  return _view != nil && [_view isFirstResponder];
+}
+
+// Note: this implicitly loads the view if it hasn't been loaded yet.
+- (BOOL)becomeFirstResponder
+{
+  ASDisplayNodeAssertMainThread();
+  return !self.layerBacked && [self canBecomeFirstResponder] && [self.view becomeFirstResponder];
+}
+
+- (BOOL)resignFirstResponder
+{
+  ASDisplayNodeAssertMainThread();
+  return !self.layerBacked && [self canResignFirstResponder] && [_view resignFirstResponder];
+}
+
+- (BOOL)canPerformAction:(SEL)action withSender:(id)sender
+{
+  ASDisplayNodeAssertMainThread();
+  return !self.layerBacked && [self.view canPerformAction:action withSender:sender];
+}
 
 - (CGFloat)alpha
 {
@@ -85,7 +120,7 @@
   return _getFromLayer(cornerRadius);
 }
 
--(void)setCornerRadius:(CGFloat)newCornerRadius
+- (void)setCornerRadius:(CGFloat)newCornerRadius
 {
   _bridge_prologue;
   _setToLayer(cornerRadius, newCornerRadius);
@@ -122,7 +157,7 @@
   // Frame is only defined when transform is identity.
 #if DEBUG
   // Checking if the transform is identity is expensive, so disable when unnecessary. We have assertions on in Release, so DEBUG is the only way I know of.
-  ASDisplayNodeAssert(CATransform3DIsIdentity(self.transform), @"Must be an identity transform");
+  ASDisplayNodeAssert(CATransform3DIsIdentity(self.transform), @"-[ASDisplayNode frame] - self.transform must be identity in order to use the frame property.  (From Apple's UIView documentation: If the transform property is not the identity transform, the value of this property is undefined and therefore should be ignored.)");
 #endif
 
   CGPoint position = self.position;
@@ -140,19 +175,44 @@
   // Frame is only defined when transform is identity because we explicitly diverge from CALayer behavior and define frame without transform
 #if DEBUG
   // Checking if the transform is identity is expensive, so disable when unnecessary. We have assertions on in Release, so DEBUG is the only way I know of.
-  ASDisplayNodeAssert(CATransform3DIsIdentity(self.transform), @"Must be an identity transform");
+  ASDisplayNodeAssert(CATransform3DIsIdentity(self.transform), @"-[ASDisplayNode setFrame:] - self.transform must be identity in order to set the frame property.  (From Apple's UIView documentation: If the transform property is not the identity transform, the value of this property is undefined and therefore should be ignored.)");
 #endif
 
-  if (_layer && ASDisplayNodeThreadIsMain()) {
-    CGPoint anchorPoint = _layer.anchorPoint;
-    _layer.bounds = CGRectMake(0, 0, rect.size.width, rect.size.height);
-    _layer.position = CGPointMake(rect.origin.x + rect.size.width * anchorPoint.x,
-                                 rect.origin.y + rect.size.height * anchorPoint.y);
+  if (_flags.synchronous && !_flags.layerBacked) {
+    // For classes like ASTableNode, ASCollectionNode, ASScrollNode and similar - make sure UIView gets setFrame:
+    _setToViewOnly(frame, rect);
   } else {
-    CGPoint anchorPoint = self.anchorPoint;
-    self.bounds = CGRectMake(0, 0, rect.size.width, rect.size.height);
-    self.position = CGPointMake(rect.origin.x + rect.size.width * anchorPoint.x,
-                                rect.origin.y + rect.size.height * anchorPoint.y);
+    // This is by far the common case / hot path.
+    [self __setSafeFrame:rect];
+  }
+}
+
+/**
+ * Sets a new frame to this node by changing its bounds and position. This method can be safely called even if
+ * the transform is a non-identity transform, because bounds and position can be set instead of frame.
+ * This is NOT called for synchronous nodes (wrapping regular views), which may rely on a [UIView setFrame:] call.
+ * A notable example of the latter is UITableView, which won't resize its internal container if only layer bounds are set.
+ */
+- (void)__setSafeFrame:(CGRect)rect
+{
+  ASDisplayNodeAssertThreadAffinity(self);
+  ASDN::MutexLocker l(_propertyLock);
+  
+  BOOL useLayer = (_layer && ASDisplayNodeThreadIsMain());
+  
+  CGPoint origin      = (useLayer ? _layer.bounds.origin : self.bounds.origin);
+  CGPoint anchorPoint = (useLayer ? _layer.anchorPoint   : self.anchorPoint);
+  
+  CGRect  bounds      = (CGRect){ origin, rect.size };
+  CGPoint position    = CGPointMake(rect.origin.x + rect.size.width * anchorPoint.x,
+                                    rect.origin.y + rect.size.height * anchorPoint.y);
+  
+  if (useLayer) {
+    _layer.bounds = bounds;
+    _layer.position = position;
+  } else {
+    self.bounds = bounds;
+    self.position = position;
   }
 }
 
@@ -169,6 +229,7 @@
 - (void)setNeedsLayout
 {
   _bridge_prologue;
+  [self __setNeedsLayout];
   _messageToViewOrLayer(setNeedsLayout);
 }
 
@@ -505,18 +566,6 @@
   _setToLayer(edgeAntialiasingMask, edgeAntialiasingMask);
 }
 
-- (NSString *)name
-{
-  _bridge_prologue;
-  return _getFromLayer(asyncdisplaykit_name);
-}
-
-- (void)setName:(NSString *)name
-{
-  _bridge_prologue;
-  _setToLayer(asyncdisplaykit_name, name);
-}
-
 - (BOOL)isAccessibilityElement
 {
   _bridge_prologue;
@@ -635,6 +684,18 @@
 {
   _bridge_prologue;
   _setToViewOnly(shouldGroupAccessibilityChildren, shouldGroupAccessibilityChildren);
+}
+
+- (NSString *)accessibilityIdentifier
+{
+  _bridge_prologue;
+  return _getFromViewOnly(accessibilityIdentifier);
+}
+
+- (void)setAccessibilityIdentifier:(NSString *)accessibilityIdentifier
+{
+  _bridge_prologue;
+  _setToViewOnly(accessibilityIdentifier, accessibilityIdentifier);
 }
 
 @end

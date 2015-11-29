@@ -11,13 +11,13 @@
 #import "ASBasicImageDownloader.h"
 #import "ASDisplayNode+Subclasses.h"
 #import "ASThread.h"
-
+#import "ASEqualityHelpers.h"
 
 @interface ASNetworkImageNode ()
 {
   ASDN::RecursiveMutex _lock;
-  id<ASImageCacheProtocol> _cache;
-  id<ASImageDownloaderProtocol> _downloader;
+  __weak id<ASImageCacheProtocol> _cache;
+  __weak id<ASImageDownloaderProtocol> _downloader;
 
   // Only access any of these with _lock.
   __weak id<ASNetworkImageNodeDelegate> _delegate;
@@ -44,13 +44,14 @@
   _cache = cache;
   _downloader = downloader;
   _shouldCacheImage = YES;
+  self.shouldBypassEnsureDisplay = YES;
 
   return self;
 }
 
 - (instancetype)init
 {
-  return [self initWithCache:nil downloader:[[ASBasicImageDownloader alloc] init]];
+  return [self initWithCache:nil downloader:[ASBasicImageDownloader sharedImageDownloader]];
 }
 
 - (void)dealloc
@@ -69,7 +70,7 @@
 {
   ASDN::MutexLocker l(_lock);
 
-  if (URL == _URL || [URL isEqual:_URL]) {
+  if (ASObjectIsEqual(URL, _URL)) {
     return;
   }
 
@@ -95,7 +96,7 @@
 {
   ASDN::MutexLocker l(_lock);
 
-  if (defaultImage == _defaultImage || [defaultImage isEqual:_defaultImage]) {
+  if (ASObjectIsEqual(defaultImage, _defaultImage)) {
     return;
   }
   _defaultImage = defaultImage;
@@ -127,12 +128,12 @@
 {
   [super displayWillStart];
 
-  [self fetchRemoteData];
+  [self fetchData];
 }
 
-- (void)clearRemoteData
+- (void)clearFetchedData
 {
-  [super clearRemoteData];
+  [super clearFetchedData];
 
   {
     ASDN::MutexLocker l(_lock);
@@ -143,9 +144,9 @@
   }
 }
 
-- (void)fetchRemoteData
+- (void)fetchData
 {
-  [super fetchRemoteData];
+  [super fetchData];
   
   {
     ASDN::MutexLocker l(_lock);

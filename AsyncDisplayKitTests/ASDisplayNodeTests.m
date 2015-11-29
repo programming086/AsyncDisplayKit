@@ -17,21 +17,33 @@
 #import "UIView+ASConvenience.h"
 
 // Conveniences for making nodes named a certain way
-
 #define DeclareNodeNamed(n) ASDisplayNode *n = [[ASDisplayNode alloc] init]; n.name = @#n
-#define DeclareViewNamed(v) UIView *v = [[UIView alloc] init]; v.layer.asyncdisplaykit_name = @#v
-#define DeclareLayerNamed(l) CALayer *l = [[CALayer alloc] init]; l.asyncdisplaykit_name = @#l
+#define DeclareViewNamed(v) UIView *v = viewWithName(@#v)
+#define DeclareLayerNamed(l) CALayer *l = layerWithName(@#l)
+
+static UIView *viewWithName(NSString *name) {
+  ASDisplayNode *n = [[ASDisplayNode alloc] init];
+  n.name = name;
+  return n.view;
+}
+
+static CALayer *layerWithName(NSString *name) {
+  ASDisplayNode *n = [[ASDisplayNode alloc] init];
+  n.layerBacked = YES;
+  n.name = name;
+  return n.layer;
+}
 
 static NSString *orderStringFromSublayers(CALayer *l) {
-  return [[[l.sublayers valueForKey:@"asyncdisplaykit_name"] allObjects] componentsJoinedByString:@","];
+  return [[l.sublayers valueForKey:@"name"] componentsJoinedByString:@","];
 }
 
 static NSString *orderStringFromSubviews(UIView *v) {
-  return [[[v.subviews valueForKeyPath:@"layer.asyncdisplaykit_name"] allObjects] componentsJoinedByString:@","];
+  return [[v.subviews valueForKey:@"name"] componentsJoinedByString:@","];
 }
 
 static NSString *orderStringFromSubnodes(ASDisplayNode *n) {
-  return [[[n.subnodes valueForKey:@"name"] allObjects] componentsJoinedByString:@","];
+  return [[n.subnodes valueForKey:@"name"] componentsJoinedByString:@","];
 }
 
 // Asserts subnode, subview, sublayer order match what you provide here
@@ -71,6 +83,9 @@ for (ASDisplayNode *n in @[ nodes ]) {\
 @property (atomic, copy) CGSize(^calculateSizeBlock)(ASTestDisplayNode *node, CGSize size);
 @end
 
+@interface ASTestResponderNode : ASTestDisplayNode
+@end
+
 @implementation ASTestDisplayNode
 
 - (CGSize)calculateSizeThatFits:(CGSize)constrainedSize
@@ -91,7 +106,55 @@ for (ASDisplayNode *n in @[ nodes ]) {\
 @interface UIDisplayNodeTestView : UIView
 @end
 
+@interface UIResponderNodeTestView : _ASDisplayView
+@property(nonatomic) BOOL isFirstResponder;
+@end
+
 @implementation UIDisplayNodeTestView
+@end
+
+@interface ASTestWindow : UIWindow
+@end
+
+@implementation ASTestWindow
+
+- (id)firstResponder {
+  return self.subviews.firstObject;
+}
+
+@end
+
+@implementation ASTestResponderNode
+
++ (Class)viewClass {
+  return [UIResponderNodeTestView class];
+}
+
+- (BOOL)canBecomeFirstResponder {
+  return YES;
+}
+
+@end
+
+@implementation UIResponderNodeTestView
+
+- (BOOL)becomeFirstResponder {
+  self.isFirstResponder = YES;
+  return YES;
+}
+
+- (BOOL)canResignFirstResponder {
+  return YES;
+}
+
+- (BOOL)resignFirstResponder {
+  if (self.isFirstResponder) {
+    self.isFirstResponder = NO;
+    return YES;
+  }
+  return NO;
+}
+
 @end
 
 @interface ASDisplayNodeTests : XCTestCase
@@ -100,6 +163,25 @@ for (ASDisplayNode *n in @[ nodes ]) {\
 @implementation ASDisplayNodeTests
 {
   dispatch_queue_t queue;
+}
+
+- (void)testOverriddenFirstResponderBehavior {
+  ASTestDisplayNode *node = [[ASTestResponderNode alloc] init];
+  XCTAssertTrue([node canBecomeFirstResponder]);
+  XCTAssertTrue([node becomeFirstResponder]);
+}
+
+- (void)testDefaultFirstResponderBehavior {
+  ASTestDisplayNode *node = [[ASTestDisplayNode alloc] init];
+  XCTAssertFalse([node canBecomeFirstResponder]);
+  XCTAssertFalse([node becomeFirstResponder]);
+}
+
+- (void)testLayerBackedFirstResponderBehavior {
+  ASTestDisplayNode *node = [[ASTestResponderNode alloc] init];
+  node.layerBacked = YES;
+  XCTAssertTrue([node canBecomeFirstResponder]);
+  XCTAssertFalse([node becomeFirstResponder]);
 }
 
 - (void)setUp
@@ -834,9 +916,9 @@ static void _addTonsOfSubnodes(ASDisplayNode *parent, NSUInteger fanout, NSUInte
 }
 
 static inline BOOL _CGPointEqualToPointWithEpsilon(CGPoint point1, CGPoint point2, CGFloat epsilon) {
-  CGFloat absEpsilon =  fabsf(epsilon);
-  BOOL xOK = fabsf(point1.x - point2.x) < absEpsilon;
-  BOOL yOK = fabsf(point1.y - point2.y) < absEpsilon;
+  CGFloat absEpsilon =  fabs(epsilon);
+  BOOL xOK = fabs(point1.x - point2.x) < absEpsilon;
+  BOOL yOK = fabs(point1.y - point2.y) < absEpsilon;
   return xOK && yOK;
 }
 
@@ -1304,7 +1386,6 @@ static inline BOOL _CGPointEqualToPointWithEpsilon(CGPoint point1, CGPoint point
   DeclareNodeNamed(b);
   DeclareNodeNamed(c);
   DeclareViewNamed(d);
-  DeclareLayerNamed(e);
 
   [parent layer];
 
@@ -1680,5 +1761,16 @@ static bool stringContainsPointer(NSString *description, const void *p) {
   [self checkNameInDescriptionIsLayerBacked:NO];
 }
 
+- (void)testBounds
+{
+  ASDisplayNode *node = [[ASDisplayNode alloc] init];
+  node.bounds = CGRectMake(1, 2, 3, 4);
+  node.frame = CGRectMake(5, 6, 7, 8);
+
+  XCTAssert(node.bounds.origin.x == 1, @"Wrong ASDisplayNode.bounds.origin.x");
+  XCTAssert(node.bounds.origin.y == 2, @"Wrong ASDisplayNode.bounds.origin.y");
+  XCTAssert(node.bounds.size.width == 7, @"Wrong ASDisplayNode.bounds.size.width");
+  XCTAssert(node.bounds.size.height == 8, @"Wrong ASDisplayNode.bounds.size.height");
+}
 
 @end
