@@ -3,13 +3,26 @@
 //  Sample
 //
 //  Created by Scott Goodson on 9/5/15.
-//  Copyright (c) 2015 Facebook. All rights reserved.
+//
+//  Copyright (c) 2014-present, Facebook, Inc.  All rights reserved.
+//  This source code is licensed under the BSD-style license found in the
+//  LICENSE file in the root directory of this source tree. An additional grant
+//  of patent rights can be found in the PATENTS file in the same directory.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+//  FACEBOOK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+//  ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+//  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
 #import "RandomCoreGraphicsNode.h"
 #import <AsyncDisplayKit/ASDisplayNode+Subclasses.h>
 
 @implementation RandomCoreGraphicsNode
+
+@synthesize indexPath=_indexPath;
 
 + (UIColor *)randomColor
 {
@@ -41,5 +54,50 @@
   CGGradientRelease(gradient);
   CGColorSpaceRelease(colorSpace);
 }
+
+- (instancetype)init
+{
+  if (!(self = [super init])) {
+    return nil;
+  }
+  
+  _indexPathTextNode = [[ASTextNode alloc] init];
+  [self addSubnode:_indexPathTextNode];
+  
+  return self;
+}
+
+- (void)setIndexPath:(NSIndexPath *)indexPath
+{
+  _indexPath = indexPath;
+  _indexPathTextNode.attributedText = [[NSAttributedString alloc] initWithString:[indexPath description] attributes:nil];
+}
+
+- (void)layout
+{
+  [super layout];
+  
+  _indexPathTextNode.frame = self.bounds;
+}
+
+#if 0
+- (void)fetchData
+{
+  NSLog(@"fetchData - %@, %@", self, self.indexPath);
+  [super fetchData];
+}
+
+- (void)clearFetchedData
+{
+  NSLog(@"clearFetchedData - %@, %@", self, self.indexPath);
+  [super clearFetchedData];
+}
+
+- (void)visibilityDidChange:(BOOL)isVisible
+{
+  NSLog(@"visibilityDidChange:%d - %@, %@", isVisible, self, self.indexPath);
+  [super visibilityDidChange:isVisible];
+}
+#endif
 
 @end

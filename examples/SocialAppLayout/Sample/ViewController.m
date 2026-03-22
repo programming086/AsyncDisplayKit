@@ -1,13 +1,19 @@
-/* This file provided by Facebook is for non-commercial testing and evaluation
- * purposes only.  Facebook reserves all rights not expressly granted.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * FACEBOOK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
- * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+//
+//  ViewController.m
+//  Sample
+//
+//  Copyright (c) 2014-present, Facebook, Inc.  All rights reserved.
+//  This source code is licensed under the BSD-style license found in the
+//  LICENSE file in the root directory of this source tree. An additional grant
+//  of patent rights can be found in the PATENTS file in the same directory.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+//  FACEBOOK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+//  ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+//  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+//
 
 #import "ViewController.h"
 #import "Post.h"
@@ -15,55 +21,52 @@
 
 #import <AsyncDisplayKit/AsyncDisplayKit.h>
 #import <AsyncDisplayKit/ASAssert.h>
+
 #include <stdlib.h>
 
-@interface ViewController () <ASTableViewDataSource, ASTableViewDelegate>
-{
-    ASTableView *_tableView;
-    
-    NSMutableArray *_socialAppDataSource;
+@interface ViewController () <ASTableDataSource, ASTableDelegate>
 
-}
+@property (nonatomic, strong) ASTableNode *tableNode;
+@property (nonatomic, strong) NSMutableArray *socialAppDataSource;
 
 @end
+
+#pragma mark - Lifecycle
 
 @implementation ViewController
 
 - (instancetype)init
 {
-    if (!(self = [super init]))
-        return nil;
+    _tableNode = [[ASTableNode alloc] initWithStyle:UITableViewStylePlain];
+  
+    self = [super initWithNode:_tableNode];
+  
+    if (self) {
     
-    _tableView = [[ASTableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain asyncDataFetching:YES];
-    _tableView.separatorStyle = UITableViewCellSeparatorStyleNone; // SocialAppNode has its own separator
-    _tableView.asyncDataSource = self;
-    _tableView.asyncDelegate = self;
-    
-    [self createSocialAppDataSource];
-    
-    self.title = @"Timeline";
-    
+        _tableNode.delegate = self;
+        _tableNode.dataSource = self;
+        _tableNode.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+      
+        self.title = @"Timeline";
+
+        [self createSocialAppDataSource];
+    }
+  
     return self;
 }
 
-- (void)viewDidLoad {
-    
+- (void)viewDidLoad
+{
     [super viewDidLoad];
-    [self.view addSubview:_tableView];
+  
+    // SocialAppNode has its own separator
+    self.tableNode.view.separatorStyle = UITableViewCellSeparatorStyleNone;
 }
 
-- (void)viewWillLayoutSubviews
+#pragma mark - Data Model
+
+- (void)createSocialAppDataSource
 {
-    _tableView.frame = self.view.bounds;
-}
-
-- (BOOL)prefersStatusBarHidden
-{
-    return YES;
-}
-
-- (void)createSocialAppDataSource {
-    
     _socialAppDataSource = [[NSMutableArray alloc] init];
     
     Post *newPost = [[Post alloc] init];
@@ -76,7 +79,6 @@
     newPost.via = 0;
     newPost.likes = arc4random_uniform(74);
     newPost.comments = arc4random_uniform(40);
-    
     [_socialAppDataSource addObject:newPost];
     
     newPost = [[Post alloc] init];
@@ -89,7 +91,6 @@
     newPost.via = 1;
     newPost.likes = arc4random_uniform(74);
     newPost.comments = arc4random_uniform(40);
-    
     [_socialAppDataSource addObject:newPost];
     
     newPost = [[Post alloc] init];
@@ -102,7 +103,6 @@
     newPost.via = 2;
     newPost.likes = arc4random_uniform(74);
     newPost.comments = arc4random_uniform(40);
-    
     [_socialAppDataSource addObject:newPost];
     
     newPost = [[Post alloc] init];
@@ -115,23 +115,22 @@
     newPost.via = 1;
     newPost.likes = arc4random_uniform(74);
     newPost.comments = arc4random_uniform(40);
-    
     [_socialAppDataSource addObject:newPost];
 }
 
-#pragma mark -
-#pragma mark ASTableView.
+#pragma mark - ASTableNode
 
-- (ASCellNode *)tableView:(ASTableView *)tableView nodeForRowAtIndexPath:(NSIndexPath *)indexPath
+- (ASCellNodeBlock)tableNode:(ASTableNode *)tableNode nodeBlockForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    Post *post = _socialAppDataSource[indexPath.row];
-    PostNode *node = [[PostNode alloc] initWithPost:post];
-    return node;
+    Post *post = self.socialAppDataSource[indexPath.row];
+    return ^{
+        return [[PostNode alloc] initWithPost:post];
+    };
 }
 
-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+- (NSInteger)tableNode:(ASTableNode *)tableNode numberOfRowsInSection:(NSInteger)section
 {
-    return _socialAppDataSource.count;
+    return self.socialAppDataSource.count;
 }
 
 @end

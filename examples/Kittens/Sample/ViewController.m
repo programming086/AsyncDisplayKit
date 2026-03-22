@@ -1,13 +1,19 @@
-/* This file provided by Facebook is for non-commercial testing and evaluation
- * purposes only.  Facebook reserves all rights not expressly granted.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * FACEBOOK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
- * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+//
+//  ViewController.m
+//  Sample
+//
+//  Copyright (c) 2014-present, Facebook, Inc.  All rights reserved.
+//  This source code is licensed under the BSD-style license found in the
+//  LICENSE file in the root directory of this source tree. An additional grant
+//  of patent rights can be found in the PATENTS file in the same directory.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+//  FACEBOOK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+//  ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+//  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+//
 
 #import "ViewController.h"
 
@@ -18,13 +24,13 @@
 #import "KittenNode.h"
 
 
-static const NSInteger kLitterSize = 20;            // intial number of kitten cells in ASTableView
-static const NSInteger kLitterBatchSize = 10;       // number of kitten cells to add to ASTableView
-static const NSInteger kMaxLitterSize = 100;        // max number of kitten cells allowed in ASTableView
+static const NSInteger kLitterSize = 20;            // intial number of kitten cells in ASTableNode
+static const NSInteger kLitterBatchSize = 10;       // number of kitten cells to add to ASTableNode
+static const NSInteger kMaxLitterSize = 100;        // max number of kitten cells allowed in ASTableNode
 
-@interface ViewController () <ASTableViewDataSource, ASTableViewDelegate>
+@interface ViewController () <ASTableDataSource, ASTableDelegate>
 {
-  ASTableView *_tableView;
+  ASTableNode *_tableNode;
 
   // array of boxed CGSizes corresponding to placekitten.com kittens
   NSMutableArray *_kittenDataSource;
@@ -41,31 +47,38 @@ static const NSInteger kMaxLitterSize = 100;        // max number of kitten cell
 
 @implementation ViewController
 
-#pragma mark -
-#pragma mark UIViewController.
+#pragma mark - Lifecycle
 
 - (instancetype)init
 {
-  if (!(self = [super init]))
-    return nil;
+  _tableNode = [[ASTableNode alloc] initWithStyle:UITableViewStylePlain];
+  _tableNode.dataSource = self;
+  _tableNode.delegate = self;
 
-  _tableView = [[ASTableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain asyncDataFetching:YES];
-  _tableView.separatorStyle = UITableViewCellSeparatorStyleNone; // KittenNode has its own separator
-  _tableView.asyncDataSource = self;
-  _tableView.asyncDelegate = self;
+  if (!(self = [super initWithNode:_tableNode]))
+    return nil;
 
   // populate our "data source" with some random kittens
   _kittenDataSource = [self createLitterWithSize:kLitterSize];
-
   _blurbNodeIndexPath = [NSIndexPath indexPathForItem:0 inSection:0];
   
   self.title = @"Kittens";
   self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemEdit
                                                                                          target:self
                                                                                          action:@selector(toggleEditingMode)];
-
+  
   return self;
 }
+
+- (void)viewDidLoad
+{
+  [super viewDidLoad];
+
+  _tableNode.view.separatorStyle = UITableViewCellSeparatorStyleNone; // KittenNode has its own separator
+  [self.node addSubnode:_tableNode];
+}
+
+#pragma mark - Data Model
 
 - (NSMutableArray *)createLitterWithSize:(NSInteger)litterSize
 {
@@ -89,41 +102,21 @@ static const NSInteger kMaxLitterSize = 100;        // max number of kitten cell
   _kittenDataSource = kittenDataSource;
 }
 
-- (void)viewDidLoad
-{
-  [super viewDidLoad];
-
-  [self.view addSubview:_tableView];
-}
-
-- (void)viewWillLayoutSubviews
-{
-  _tableView.frame = self.view.bounds;
-}
-
-- (BOOL)prefersStatusBarHidden
-{
-  return YES;
-}
-
 - (void)toggleEditingMode
 {
-  [_tableView setEditing:!_tableView.editing animated:YES];
+  [_tableNode.view setEditing:!_tableNode.view.editing animated:YES];
 }
 
 
-#pragma mark -
-#pragma mark ASTableView.
+#pragma mark - ASTableNode
 
-- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
+- (NSInteger)tableNode:(ASTableNode *)tableNode numberOfRowsInSection:(NSInteger)section
 {
-  [_tableView deselectRowAtIndexPath:indexPath animated:YES];
-  // Assume only kitten nodes are selectable (see -tableView:shouldHighlightRowAtIndexPath:).
-  KittenNode *node = (KittenNode *)[_tableView nodeForRowAtIndexPath:indexPath];
-  [node toggleImageEnlargement];
+  // blurb node + kLitterSize kitties
+  return 1 + _kittenDataSource.count;
 }
 
-- (ASCellNode *)tableView:(ASTableView *)tableView nodeForRowAtIndexPath:(NSIndexPath *)indexPath
+- (ASCellNode *)tableNode:(ASTableNode *)tableNode nodeForRowAtIndexPath:(NSIndexPath *)indexPath
 {
   // special-case the first row
   if ([_blurbNodeIndexPath compare:indexPath] == NSOrderedSame) {
@@ -136,58 +129,48 @@ static const NSInteger kMaxLitterSize = 100;        // max number of kitten cell
   return node;
 }
 
-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+- (void)tableNode:(ASTableNode *)tableNode didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
-  // blurb node + kLitterSize kitties
-  return 1 + _kittenDataSource.count;
+  [_tableNode deselectRowAtIndexPath:indexPath animated:YES];
+  
+  // Assume only kitten nodes are selectable (see -tableNode:shouldHighlightRowAtIndexPath:).
+  KittenNode *node = (KittenNode *)[_tableNode nodeForRowAtIndexPath:indexPath];
+  
+  [node toggleImageEnlargement];
 }
 
-- (BOOL)tableView:(UITableView *)tableView shouldHighlightRowAtIndexPath:(NSIndexPath *)indexPath
+- (BOOL)tableNode:(ASTableNode *)tableNode shouldHighlightRowAtIndexPath:(NSIndexPath *)indexPath
 {
   // Enable selection for kitten nodes
   return [_blurbNodeIndexPath compare:indexPath] != NSOrderedSame;
 }
 
-- (void)tableViewLockDataSource:(ASTableView *)tableView
+- (void)tableNode:(ASTableNode *)tableNode willBeginBatchFetchWithContext:(nonnull ASBatchContext *)context
 {
-  self.dataSourceLocked = YES;
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // populate a new array of random-sized kittens
+    NSArray *moarKittens = [self createLitterWithSize:kLitterBatchSize];
+
+    NSMutableArray *indexPaths = [[NSMutableArray alloc] init];
+      
+    // find number of kittens in the data source and create their indexPaths
+    NSInteger existingRows = _kittenDataSource.count + 1;
+      
+    for (NSInteger i = 0; i < moarKittens.count; i++) {
+      [indexPaths addObject:[NSIndexPath indexPathForRow:existingRows + i inSection:0]];
+    }
+
+    // add new kittens to the data source & notify table of new indexpaths
+    [_kittenDataSource addObjectsFromArray:moarKittens];
+    [tableNode insertRowsAtIndexPaths:indexPaths withRowAnimation:UITableViewRowAnimationFade];
+
+    [context completeBatchFetching:YES];
+  });
 }
 
-- (void)tableViewUnlockDataSource:(ASTableView *)tableView
-{
-  self.dataSourceLocked = NO;
-}
-
-- (BOOL)shouldBatchFetchForTableView:(UITableView *)tableView
+- (BOOL)shouldBatchFetchForTableNode:(ASTableNode *)tableNode
 {
   return _kittenDataSource.count < kMaxLitterSize;
-}
-
-- (void)tableView:(UITableView *)tableView willBeginBatchFetchWithContext:(ASBatchContext *)context
-{
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    sleep(1);
-    dispatch_async(dispatch_get_main_queue(), ^{
-        
-      // populate a new array of random-sized kittens
-      NSArray *moarKittens = [self createLitterWithSize:kLitterBatchSize];
-
-      NSMutableArray *indexPaths = [[NSMutableArray alloc] init];
-        
-      // find number of kittens in the data source and create their indexPaths
-      NSInteger existingRows = _kittenDataSource.count + 1;
-        
-      for (NSInteger i = 0; i < moarKittens.count; i++) {
-        [indexPaths addObject:[NSIndexPath indexPathForRow:existingRows + i inSection:0]];
-      }
-
-      // add new kittens to the data source & notify table of new indexpaths
-      [_kittenDataSource addObjectsFromArray:moarKittens];
-      [tableView insertRowsAtIndexPaths:indexPaths withRowAnimation:UITableViewRowAnimationFade];
-
-      [context completeBatchFetching:YES];
-    });
-  });
 }
 
 - (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath
@@ -196,12 +179,13 @@ static const NSInteger kMaxLitterSize = 100;        // max number of kitten cell
   return [_blurbNodeIndexPath compare:indexPath] != NSOrderedSame;
 }
 
-- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath
+- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
+                                            forRowAtIndexPath:(NSIndexPath *)indexPath
 {
   if (editingStyle == UITableViewCellEditingStyleDelete) {
     // Assume only kitten nodes are editable (see -tableView:canEditRowAtIndexPath:).
     [_kittenDataSource removeObjectAtIndex:indexPath.row - 1];
-    [_tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+    [_tableNode deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
   }
 }
 
